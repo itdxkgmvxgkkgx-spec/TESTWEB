@@ -16,10 +16,10 @@
     "6GBNOSRAT": {
         "uuid": "3c1b43aa-a0b3-411f-be13-7f75f1063c04",
         "total_limit_bytes": 6442450944,
-        "used_bytes": 1273127,
+        "used_bytes": 1685157,
         "clean_ip": "172.64.149.23",
         "status": "OFFLINE",
-        "last_active_time": 1790520939.6216545,
+        "last_active_time": 1790523449.8063807,
         "down_speed": 0,
         "up_speed": 0,
         "created_at": 1790520080,
