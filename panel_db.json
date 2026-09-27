@@ -29,12 +29,12 @@
     "\u0181K.WYKING": {
         "uuid": "5ad8e958-8e89-4177-bf1d-ca271bc2205e",
         "total_limit_bytes": 0,
-        "used_bytes": 213708363,
+        "used_bytes": 216732068,
         "clean_ip": "172.64.149.23",
         "status": "ONLINE",
-        "last_active_time": 1790530233.4629147,
-        "down_speed": 1257005,
-        "up_speed": 73534,
+        "last_active_time": 1790530296.529292,
+        "down_speed": 922512,
+        "up_speed": 68456,
         "created_at": 1790520299,
         "expire_seconds": 10368000,
         "active": true
