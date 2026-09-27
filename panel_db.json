@@ -12,5 +12,18 @@
         "expire_seconds": 25920002722,
         "active": true,
         "coefficient": 10.0
+    },
+    "6GBNOSRAT": {
+        "uuid": "3c1b43aa-a0b3-411f-be13-7f75f1063c04",
+        "total_limit_bytes": 6442450944,
+        "used_bytes": 0,
+        "clean_ip": "172.64.149.23",
+        "status": "OFFLINE",
+        "last_active_time": 0,
+        "down_speed": 0,
+        "up_speed": 0,
+        "created_at": 1790520080,
+        "expire_seconds": 604800,
+        "active": true
     }
 }
