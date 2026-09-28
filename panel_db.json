@@ -11,7 +11,10 @@
         "created_at": 1787606972,
         "expire_seconds": 25920002722,
         "active": true,
-        "coefficient": 10.0
+        "coefficient": 10.0,
+        "sub_token": "S3c-EbHeIV5JUPKCQnsVfbutWC01vhBj",
+        "stats_offset": 0,
+        "stats_last": 0
     },
     "6GBNOSRAT": {
         "uuid": "3c1b43aa-a0b3-411f-be13-7f75f1063c04",
@@ -24,7 +27,10 @@
         "up_speed": 0,
         "created_at": 1790520080,
         "expire_seconds": 604800,
-        "active": true
+        "active": true,
+        "sub_token": "TyW9qhhTZ_qEDb23ktOTZOLYRbzisfp_",
+        "stats_offset": 0,
+        "stats_last": 0
     },
     "\u0181K.WYKING": {
         "uuid": "5ad8e958-8e89-4177-bf1d-ca271bc2205e",
@@ -37,6 +43,9 @@
         "up_speed": 56553,
         "created_at": 1790520299,
         "expire_seconds": 10368000,
-        "active": true
+        "active": true,
+        "sub_token": "8PqZfSo0_1i-42Mmq32Sk37Z2YZCNGUn",
+        "stats_offset": 0,
+        "stats_last": 0
     }
 }
