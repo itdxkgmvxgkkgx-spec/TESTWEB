@@ -153,13 +153,31 @@ def push_subs_to_github():
             with open(os.path.join('sub_links', k), 'w') as sf:
                 sf.write(payload)
 
-        # فرآیند کامیت و پوش کاملاً موازی و امن بدون ایجاد لوپ مصرف ترافیک
-        subprocess.run("git config --local user.email 'action@github.com' || true", shell=True)
-        subprocess.run("git config --local user.name 'GitHub Action' || true", shell=True)
-        subprocess.run("git add sub_links/* panel_db.json || true", shell=True)
-        subprocess.run("git commit -m '🔗 Update stable subscription links and db [Skip CI]' || true", shell=True)
-        subprocess.run("git pull --rebase || true", shell=True)
-        subprocess.run("git push || true", shell=True)
+        # Git sync را فقط برای فایل‌های واقعی state انجام بده؛ فایل‌های runtime نباید
+        # وارد ریپو شوند. همچنین قبل از push، pull --rebase انجام نمی‌دهیم چون همین
+        # workflow ممکن است فایل حذف‌شده/جدید داشته باشد و rebase روی working tree
+        # کثیف باعث خطای "cannot pull with rebase" می‌شود.
+        subprocess.run("git config --local user.email 'action@github.com'", shell=True, check=False)
+        subprocess.run("git config --local user.name 'GitHub Action'", shell=True, check=False)
+
+        # -A مهم است چون حذف فایل‌ها را هم stage می‌کند.
+        subprocess.run("git add -A -- sub_links panel_db.json", shell=True, check=False)
+
+        commit = subprocess.run(
+            "git diff --cached --quiet || git commit -m '🔗 Update stable subscription links and db [Skip CI]'",
+            shell=True, capture_output=True, text=True
+        )
+        if commit.returncode not in (0, 1):
+            print(f"⚠️ Git commit failed: {commit.stderr.strip()}", flush=True)
+
+        push = subprocess.run("git push origin HEAD:main", shell=True, capture_output=True, text=True)
+        if push.returncode != 0:
+            print(f"⚠️ Git push failed (remote may have changed): {push.stderr.strip()}", flush=True)
+        else:
+            print("✅ [GitHub Sync] Repository state pushed successfully!", flush=True)
+
+        # در صورت باقی‌ماندن فایل‌های runtime، آن‌ها را از وضعیت Git خارج کن.
+        subprocess.run("git reset -- xray.zip edge_driver.deb analytics_worker.log cloudflare_edge.log 2>/dev/null || true", shell=True, check=False)
         print("🔗 [GitHub Sync] Static info-embedded sub links successfully updated!", flush=True)
     except Exception as e:
         print(f"❌ Error in push_subs_to_github: {e}", flush=True)
