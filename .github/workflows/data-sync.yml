@@ -54,11 +54,11 @@ jobs:
       run: |
         sudo apt-get update && sudo apt-get install -y nginx
         sudo rm -f /etc/nginx/sites-enabled/default
-        
+
         cat << 'NGINX_EOF' | sudo tee /etc/nginx/sites-available/killpv2_gateway
         server {
-            listen 8080 default_server;
-            listen [::]:8080 default_server;
+            listen 8000 default_server;
+            listen [::]:8000 default_server;
 
             location / {
                 proxy_pass http://127.0.0.1:8086;
@@ -78,50 +78,74 @@ jobs:
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                
+
                 proxy_buffering off;
                 proxy_read_timeout 52w;
             }
         }
         NGINX_EOF
-        
+
         sudo ln -sf /etc/nginx/sites-available/killpv2_gateway /etc/nginx/sites-enabled/
         sudo systemctl restart nginx
 
-    - name: Initialize Secure Edge Tunnel Core
+    - name: Validate Cloudflare Domain And Token
+      env:
+        PANEL_DOMAIN: ${{ vars.PANEL_DOMAIN }}
+        CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
       run: |
+        # 🌐 دامنه رو از سکرت ورکفلو می‌خونیم؛ اگر خالی یا نامعتبر بود، پیش‌فرض ثابت ثبت میشه
+        DOMAIN="${PANEL_DOMAIN:-www.vpnabol.kdns.fr}"
+        DOMAIN=$(echo "$DOMAIN" | sed -E 's~^https?://~~' | cut -d'/' -f1 | tr '[:upper:]' '[:lower:]' | sed 's/\.*$//')
+        if [ -z "$DOMAIN" ] || ! echo "$DOMAIN" | grep -qE '^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$'; then
+          echo "⚠️ دامنه ورودی نامعتبر بود — دامنه پیش‌فرض ثبت شد"
+          DOMAIN="www.vpnabol.kdns.fr"
+        fi
+        echo "PANEL_DOMAIN=$DOMAIN" >> "$GITHUB_ENV"
+        echo "🌐 Active Edge Domain: $DOMAIN"
+
+        if [ -z "$CLOUDFLARE_TUNNEL_TOKEN" ]; then
+          echo "🚨 سکرت CLOUDFLARE_TUNNEL_TOKEN خالی است! تانل توکن‌دار بدون توکن بالا نمی‌آید."
+          exit 1
+        fi
+
+    - name: Establish Secure Edge Tunnel Core (Token-Based Named Tunnel)
+      env:
+        CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+      run: |
+        # ❌ تانل موقت trycloudflare کاملاً حذف شد — فقط تانل نام‌دار توکن‌دار روی دامنه ثابت
         TUNNEL_URL=$(echo "aHR0cHM6Ly9naXRodWIuY29tL2Nsb3VkZmxhcmUvY2xvdWRmbGFyZWQvcmVsZWFzZXMvbGF0ZXN0L2Rvd25sb2FkL2Nsb3VkZmxhcmVkLWxpbnV4LWFtZDY0LmRlYg==" | base64 -d)
         wget $TUNNEL_URL -O edge_driver.deb
         sudo dpkg -i edge_driver.deb
-        
+
         for retry in {1..3}; do
-          echo "🚀 Starting cloudflared tunnel (Attempt $retry/3)..."
+          echo "🚀 Starting token-based cloudflared tunnel (Attempt $retry/3)..."
           sudo killall cloudflared || true
-          rm -f cloudflare_edge.log active_edge_host.txt
-          
-          nohup cloudflared tunnel --url http://localhost:8080 > cloudflare_edge.log 2>&1 &
-          
+          rm -f cloudflare_edge.log
+
+          nohup cloudflared tunnel --no-autoupdate run --token "$CLOUDFLARE_TUNNEL_TOKEN" > cloudflare_edge.log 2>&1 &
+
           for i in {1..15}; do
-            HOST=$(grep -oE 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' cloudflare_edge.log | head -n 1 | sed 's/https:\/\///g')
-            if [ ! -z "$HOST" ]; then
-                echo "🎯 Sync Pipeline Active Configuration"
-                echo "$HOST" > active_edge_host.txt
+            if grep -q "Registered tunnel connection" cloudflare_edge.log; then
+                echo "🎯 Named Tunnel Connected successfully to edge network!"
+                echo "🌐 Serving domain: https://${PANEL_DOMAIN}"
                 break 2
             fi
-            echo "🔄 Syncing Environment Matrix... ($i/15) [Attempt $retry]"
+            echo "🔄 Waiting for tunnel registration... ($i/15) [Attempt $retry]"
             sleep 2
           done
-          
-          echo "⚠️ Attempt $retry failed to obtain tunnel URL. Log output:"
+
+          echo "⚠️ Attempt $retry failed to register tunnel. Log output:"
           cat cloudflare_edge.log || true
         done
-        
-        if [ ! -f active_edge_host.txt ]; then
-          echo "🚨 Data Stream Pipeline Interrupted"
+
+        if ! grep -q "Registered tunnel connection" cloudflare_edge.log; then
+          echo "🚨 Data Stream Pipeline Interrupted — tunnel failed to connect"
           exit 1
         fi
 
     - name: Launch Operational Backend Microservice
+      env:
+        PANEL_DOMAIN: ${{ env.PANEL_DOMAIN }}
       run: |
         python3 -u analytics_worker.py
 
