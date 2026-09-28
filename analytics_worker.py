@@ -1091,19 +1091,17 @@ threading.Thread(target=lambda: HTTPServer(('127.0.0.1', 8086), SanaeiMobileXuiS
 threading.Thread(target=xray_live_log_sniffer, daemon=True).start()
 threading.Thread(target=xray_traffic_collector, daemon=True).start()
 
-total_duration = 19800
-elapsed = 0
 print("🚀 Stable Microservice deployed inside GitHub Action Engine.", flush=True)
 
-# ثبت زمان اولیه برای سیستم زمان‌بندی دقیق هر یک دقیقه
+# GitHub Actions owns the service lifetime. The worker itself stays alive until
+# the workflow stops it, preventing a second independent timer from creating a gap.
 last_github_update_time = time.time()
 
-while elapsed < total_duration:
+while True:
     time.sleep(10)
-    elapsed += 10
     check_expiration_and_limits()
 
-    # 🔄 مکانیزم خودکار آپدیت حجم کلاینت‌ها روی گیت‌هاب راس هر ۱ دقیقه (۶0 ثانیه)
+    # 🔄 Keep subscription/state files synchronized approximately every minute.
     if time.time() - last_github_update_time >= 60:
         print("🔄 [Periodic Sync] Running 1-minute auto-update for subscription info...", flush=True)
         push_subs_to_github()
