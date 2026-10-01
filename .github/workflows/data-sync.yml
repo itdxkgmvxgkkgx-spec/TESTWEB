@@ -101,12 +101,14 @@ jobs:
           PANEL_DOMAIN: ${{ vars.PANEL_DOMAIN }}
           CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
         run: |
-          DOMAIN="${PANEL_DOMAIN:-www.vpnabol.kdns.fr}"
+          DOMAIN="${PANEL_DOMAIN:-killpv2.dpdns.org}"
           DOMAIN=$(echo "$DOMAIN" | sed -E 's~^https?://~~' | cut -d'/' -f1 | tr '[:upper:]' '[:lower:]' | sed 's/\.*$//')
+
           if [ -z "$DOMAIN" ] || ! echo "$DOMAIN" | grep -qE '^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$'; then
-            echo "⚠️ دامنه نامعتبر بود؛ از www.vpnabol.kdns.fr استفاده می‌شود."
-            DOMAIN="www.vpnabol.kdns.fr"
+            echo "⚠️ دامنه نامعتبر بود؛ از killpv2.dpdns.org استفاده می‌شود."
+            DOMAIN="killpv2.dpdns.org"
           fi
+
           echo "PANEL_DOMAIN=$DOMAIN" >> "$GITHUB_ENV"
           echo "🌐 Active Edge Domain: $DOMAIN"
 
@@ -122,12 +124,14 @@ jobs:
           LOG_DIR="/tmp/killpv2-runtime/logs"
           mkdir -p "$LOG_DIR"
           rm -f "$LOG_DIR/analytics_worker.log"
+
           nohup python3 -u analytics_worker.py > "$LOG_DIR/analytics_worker.log" 2>&1 &
           BACKEND_PID=$!
           echo "BACKEND_PID=$BACKEND_PID" >> "$GITHUB_ENV"
           echo "🚀 Backend PID: $BACKEND_PID"
 
           echo "⏳ Waiting for backend on 127.0.0.1:8086 ..."
+
           for i in {1..90}; do
             if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
               echo "❌ Backend exited before becoming ready."
@@ -145,6 +149,7 @@ jobs:
               cat /tmp/killpv2-runtime/logs/analytics_worker.log || true
               exit 1
             fi
+
             sleep 2
           done
 
@@ -157,20 +162,24 @@ jobs:
         run: |
           TUNNEL_URL=$(echo "aHR0cHM6Ly9naXRodWIuY29tL2Nsb3VkZmxhcmUvY2xvdWRmbGFyZWQvcmVsZWFzZXMvbGF0ZXN0L2Rvd25sb2FkL2Nsb3VkZmxhcmVkLWxpbnV4LWFtZDY0LmRlYg==" | base64 -d)
           RUNTIME_DIR="/tmp/killpv2-runtime"
+
           mkdir -p "$RUNTIME_DIR"
           wget "$TUNNEL_URL" -O "$RUNTIME_DIR/edge_driver.deb"
           sudo dpkg -i "$RUNTIME_DIR/edge_driver.deb"
 
           sudo killall cloudflared || true
+
           LOG_DIR="/tmp/killpv2-runtime/logs"
           mkdir -p "$LOG_DIR"
           rm -f "$LOG_DIR/cloudflare_edge.log"
+
           nohup cloudflared tunnel --no-autoupdate run --token "$CLOUDFLARE_TUNNEL_TOKEN" > "$LOG_DIR/cloudflare_edge.log" 2>&1 &
           CLOUDFLARED_PID=$!
           echo "CLOUDFLARED_PID=$CLOUDFLARED_PID" >> "$GITHUB_ENV"
 
           echo "🚇 Cloudflared PID: $CLOUDFLARED_PID"
           echo "⏳ Waiting for cloudflared process and local gateway..."
+
           for i in {1..45}; do
             if ! kill -0 "$CLOUDFLARED_PID" 2>/dev/null; then
               echo "❌ cloudflared exited unexpectedly."
@@ -199,13 +208,16 @@ jobs:
           fi
 
           echo "🌍 Testing the public Cloudflare endpoint: https://${PANEL_DOMAIN}"
+
           public_ok=0
+
           for i in {1..30}; do
             if curl -kfsS --connect-timeout 5 --max-time 15 "https://${PANEL_DOMAIN}/" >/dev/null 2>&1; then
               echo "✅ Public endpoint is reachable through Cloudflare."
               public_ok=1
               break
             fi
+
             echo "🔄 Public endpoint not ready yet ($i/30)."
             sleep 3
           done
@@ -214,10 +226,13 @@ jobs:
             echo "❌ Public endpoint is not reachable. This usually means the Tunnel token's ingress/hostname points to the wrong service."
             echo "--- cloudflared log ---"
             tail -n 160 /tmp/killpv2-runtime/logs/cloudflare_edge.log || true
+
             echo "--- nginx status ---"
             sudo systemctl status nginx --no-pager || true
+
             echo "--- backend log ---"
             tail -n 160 /tmp/killpv2-runtime/logs/analytics_worker.log || true
+
             exit 1
           fi
 
@@ -229,6 +244,7 @@ jobs:
           END_TIME=$((START_TIME + RUN_SECONDS))
 
           echo "🟢 Service monitor started for ${RUN_SECONDS}s."
+
           while [ "$(date +%s)" -lt "$END_TIME" ]; do
             sleep 15
 
@@ -266,8 +282,10 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+
           # فقط state واقعی را stage کن؛ runtime files خارج از repo هستند.
           git add -A -- panel_db.json sub_links || true
+
           if ! git diff --cached --quiet; then
             git commit -m "🔄 Save panel state before rotation [Skip CI]" || true
             git push origin HEAD:main || true
@@ -284,6 +302,7 @@ jobs:
             echo "⚠️ GH_PAT is missing; the current cycle completed but the next cycle was not dispatched."
             exit 0
           fi
+
           gh workflow run data-sync.yml --ref main
           echo "⛓️ Next synchronization cycle dispatched."
 
